@@ -36,8 +36,9 @@ class CurrencyService {
     };
     final f = from.toUpperCase();
     final t = to.toUpperCase();
-    if (!rates.containsKey(f) || !rates.containsKey(t))
+    if (!rates.containsKey(f) || !rates.containsKey(t)) {
       throw Exception('Currency unsupported');
+    }
     final usd = amount * rates[f]!;
     return usd / rates[t]!;
   }
