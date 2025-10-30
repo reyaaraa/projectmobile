@@ -8,62 +8,99 @@ import '../models/air_quality.dart';
 import '../widgets/info_card.dart';
 import '../widgets/converter_card.dart';
 import '../services/notification_service.dart';
-import 'detail_page.dart';
+import '../services/secure_store.dart';
+import 'login_page.dart';
+import 'toko.dart';
 
-/// HomePage
-/// - Menggunakan sensor lokasi (LocationService) untuk menentukan koordinat
-/// - Mengambil AQI dari AirVisual (AirService)
-/// - Menampilkan kartu InfoCard, ConverterCard (uang & waktu), tombol notifikasi
-/// - Notifikasi menggunakan NotificationService (system notification)
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final LocationService _loc = LocationService();
-  final AirService _air = AirService();
+  final LocationService _lokasi = LocationService();
+  final AirService _udara = AirService();
 
-  AirQuality? _aqiData;
-  bool _loading = true;
-  String? _error;
+  AirQuality? _dataAqi;
+  bool _sedangMemuat = true;
+  String? _pesanError;
+
+  final TextEditingController _cariKota = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchWithLocation();
+    _ambilDenganLokasi();
   }
 
-  Future<void> _fetchWithLocation() async {
+  // =======================
+  // Ambil data berdasar lokasi GPS
+  // =======================
+  Future<void> _ambilDenganLokasi() async {
     setState(() {
-      _loading = true;
-      _error = null;
+      _sedangMemuat = true;
+      _pesanError = null;
     });
+
     try {
-      final pos = await _loc.getCurrentPosition();
-      final json = await _air.fetchNearestCity(
-        lat: pos.latitude,
-        lon: pos.longitude,
+      final posisi = await _lokasi.getCurrentPosition();
+      final json = await _udara.fetchNearestCity(
+        lat: posisi.latitude,
+        lon: posisi.longitude,
       );
-      _aqiData = AirQuality.fromJson(json);
-      // Jika AQI berbahaya, kirim notifikasi (system)
-      if (_aqiData!.aqi > 200) {
+
+      _dataAqi = AirQuality.fromJson(json);
+
+      // Jika udara berbahaya, kirim notifikasi dengan waktu
+      if (_dataAqi!.aqi > 200) {
         await NotificationService.showNotification(
-          title: 'Peringatan Polusi',
-          body: 'AQI ${_aqiData!.aqi} — Hindari keluar rumah!',
+          title: '⚠️ Peringatan Polusi!',
+          body: 'AQI ${_dataAqi!.aqi} — Hindari keluar rumah!',
+          aqi: _dataAqi!.aqi,
         );
       }
+
+      // Jika udara tidak sehat, tampilkan dialog
+      if (_dataAqi!.aqi >= 10) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          _tampilkanDialogAqi(_dataAqi!.aqi);
+        });
+      }
     } catch (e) {
-      _error = e.toString();
+      _pesanError = e.toString();
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      setState(() => _sedangMemuat = false);
     }
   }
 
-  Color _aqiColor(int aqi) {
+  // =======================
+  // Ambil data berdasar nama kota (manual search)
+  // =======================
+  Future<void> _ambilBerdasarkanKota(String kota) async {
+    if (kota.isEmpty) return;
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _sedangMemuat = true;
+      _pesanError = null;
+    });
+
+    try {
+      final json = await _udara.fetchByCity(kota);
+      _dataAqi = AirQuality.fromJson(json);
+    } catch (e) {
+      _pesanError = "Gagal menemukan data untuk kota '$kota'";
+    } finally {
+      setState(() => _sedangMemuat = false);
+    }
+  }
+
+  // =======================
+  // Warna & status AQI
+  // =======================
+  Color _warnaAqi(int aqi) {
     if (aqi <= 50) return const Color(0xFF2BB5A3);
     if (aqi <= 100) return Colors.amber;
     if (aqi <= 150) return Colors.orange;
@@ -71,14 +108,78 @@ class _HomePageState extends State<HomePage> {
     return Colors.purple;
   }
 
-  String _aqiStatus(int aqi) {
+  String _statusAqi(int aqi) {
     if (aqi <= 50) return 'Udara Baik 🌿 – Aman';
     if (aqi <= 100) return 'Sedang 😐 – Waspada';
-    if (aqi <= 150) return 'Tidak Sehat 😷 – Kurangi aktivitas';
+    if (aqi <= 150) return 'Tidak Sehat 😷 – Kurangi aktivitas luar';
     if (aqi <= 200) return 'Buruk 😫 – Gunakan masker';
     return 'Sangat Berbahaya ☠️ – Hindari keluar rumah';
   }
 
+  // =======================
+  // Logout
+  // =======================
+  Future<void> _logout() async {
+    await SecureStore.delete('session_user');
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
+    }
+  }
+
+  // =======================
+  // Dialog peringatan
+  // =======================
+  void _tampilkanDialogAqi(int aqi) {
+    final status = _statusAqi(aqi);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFFF9FCFB),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Peringatan Kualitas Udara!',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF00796B),
+          ),
+        ),
+        content: Text(
+          'Kualitas udara sedang buruk.\n\n'
+          '$status\n\n'
+          'Gunakan masker dan konsumsi suplemen untuk menjaga daya tahan tubuh.',
+          style: const TextStyle(color: Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2BB5A3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TokoPage()),
+              );
+            },
+            icon: const Icon(Icons.store_mall_directory_outlined),
+            label: const Text('Kunjungi Toko'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =======================
+  // UI
+  // =======================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -91,28 +192,25 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: const Color(0xFF2BB5A3),
         actions: [
           IconButton(
-            onPressed: () async {
-              // manual refresh + notifikasi simple
-              await _fetchWithLocation();
-              if (_aqiData != null) {
-                await NotificationService.showNotification(
-                  title: 'ParuGuard',
-                  body: 'AQI ${_aqiData!.aqi} (${_aqiData!.city})',
-                );
-              }
-            },
-            icon: const Icon(Icons.refresh),
+            onPressed: _ambilDenganLokasi,
+            icon: const Icon(Icons.my_location),
+            tooltip: "Gunakan Lokasi Saat Ini",
+          ),
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: "Logout",
           ),
         ],
       ),
-      body: _loading
+      body: _sedangMemuat
           ? Center(child: Lottie.asset('assets/loading.json', width: 140))
-          : _error != null
+          : _pesanError != null
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Error: $_error',
+                  _pesanError!,
                   style: const TextStyle(color: Colors.red),
                   textAlign: TextAlign.center,
                 ),
@@ -122,13 +220,50 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // decorative breathing Lottie
+                  // =======================
+                  // Pencarian cepat di Home
+                  // =======================
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _cariKota,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (value) => _ambilBerdasarkanKota(value),
+                      decoration: InputDecoration(
+                        hintText: "Cari kota (contoh: Jakarta, Tokyo, London)",
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.send),
+                          onPressed: () =>
+                              _ambilBerdasarkanKota(_cariKota.text),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // =======================
+                  // Tampilan hasil AQI
+                  // =======================
                   Lottie.asset('assets/breathing_exercise.json', width: 180),
                   const SizedBox(height: 8),
-
-                  // location text
                   Text(
-                    '${_aqiData!.city}, ${_aqiData!.state}',
+                    '${_dataAqi!.city}, ${_dataAqi!.state}',
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -136,55 +271,31 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Info card AQI
                   InfoCard(
-                    aqi: _aqiData!.aqi,
-                    status: _aqiStatus(_aqiData!.aqi),
-                    color: _aqiColor(_aqiData!.aqi),
+                    aqi: _dataAqi!.aqi,
+                    status: _statusAqi(_dataAqi!.aqi),
+                    color: _warnaAqi(_dataAqi!.aqi),
                   ),
                   const SizedBox(height: 12),
 
-                  // Converter (uang & waktu) inline in main theme (not a separate menu)
-                  const ConverterCard(),
-                  const SizedBox(height: 12),
-
-                  // Buttons: detail (open detail page) and notify (system)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // buka halaman detail yang menampilkan AQI & cuaca + kompas
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetailPage(
-                                airQuality: _aqiData!,
-                                lat: null,
-                                lon: null,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.open_in_new),
-                        label: const Text('Lihat Detail'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1C8E82),
-                        ),
+                  // Tombol notifikasi manual dengan waktu
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2BB5A3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
                       ),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          // contoh notifikasi manual
-                          await NotificationService.showNotification(
-                            title: 'ParuGuard',
-                            body: 'AQI sekarang: ${_aqiData!.aqi}',
-                          );
-                        },
-                        icon: const Icon(Icons.notifications),
-                        label: const Text('Notifikasi'),
-                      ),
-                    ],
+                    ),
+                    onPressed: () async {
+                      await NotificationService.showNotification(
+                        title: '🫁 ParuGuard',
+                        body: 'AQI sekarang: ${_statusAqi(_dataAqi!.aqi)}',
+                        aqi: _dataAqi!.aqi,
+                      );
+                    },
+                    icon: const Icon(Icons.notifications_active),
+                    label: const Text('Kirim Notifikasi dengan Waktu'),
                   ),
                 ],
               ),
