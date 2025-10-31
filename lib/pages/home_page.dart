@@ -10,7 +10,8 @@ import '../widgets/converter_card.dart';
 import '../services/notification_service.dart';
 import '../services/secure_store.dart';
 import 'login_page.dart';
-import 'toko.dart';
+import '../pages/toko.dart';
+import '../pages/navbar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -54,7 +55,7 @@ class _HomePageState extends State<HomePage> {
       _dataAqi = AirQuality.fromJson(json);
 
       // Jika udara berbahaya, kirim notifikasi dengan waktu
-      if (_dataAqi!.aqi > 200) {
+      if (_dataAqi!.aqi > 20) {
         await NotificationService.showNotification(
           title: '⚠️ Peringatan Polusi!',
           body: 'AQI ${_dataAqi!.aqi} — Hindari keluar rumah!',
@@ -62,8 +63,8 @@ class _HomePageState extends State<HomePage> {
         );
       }
 
-      // Jika udara tidak sehat, tampilkan dialog
-      if (_dataAqi!.aqi >= 10) {
+      // Jika udara tidak sehat, tampilkan toko
+      if (_dataAqi!.aqi >= 110) {
         Future.delayed(const Duration(milliseconds: 600), () {
           _tampilkanDialogAqi(_dataAqi!.aqi);
         });
@@ -123,7 +124,9 @@ class _HomePageState extends State<HomePage> {
     await SecureStore.delete('session_user');
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
     }
   }
 
@@ -164,10 +167,8 @@ class _HomePageState extends State<HomePage> {
             ),
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TokoPage()),
-              );
+              // Cari state Navbar terdekat dan pindah tab ke Toko (indeks 1)
+              context.findAncestorStateOfType<NavbarState>()?.onItemTapped(1);
             },
             icon: const Icon(Icons.store_mall_directory_outlined),
             label: const Text('Kunjungi Toko'),
@@ -183,26 +184,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'ParuGuard',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF2BB5A3),
-        actions: [
-          IconButton(
-            onPressed: _ambilDenganLokasi,
-            icon: const Icon(Icons.my_location),
-            tooltip: "Gunakan Lokasi Saat Ini",
-          ),
-          IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
-            tooltip: "Logout",
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF9FCFB),
       body: _sedangMemuat
           ? Center(child: Lottie.asset('assets/loading.json', width: 140))
           : _pesanError != null
@@ -219,7 +201,28 @@ class _HomePageState extends State<HomePage> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Header dan Tombol Logout
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'ParuGuard',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _logout,
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        tooltip: "Logout",
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
                   // =======================
                   // Pencarian cepat di Home
                   // =======================
@@ -255,7 +258,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // =======================
                   // Tampilan hasil AQI
@@ -276,26 +279,18 @@ class _HomePageState extends State<HomePage> {
                     status: _statusAqi(_dataAqi!.aqi),
                     color: _warnaAqi(_dataAqi!.aqi),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                  // Tombol notifikasi manual dengan waktu
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2BB5A3),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+                  // Tombol Aksi
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _ambilDenganLokasi,
+                        icon: const Icon(Icons.my_location),
+                        label: const Text("Lokasi Saya"),
                       ),
-                    ),
-                    onPressed: () async {
-                      await NotificationService.showNotification(
-                        title: '🫁 ParuGuard',
-                        body: 'AQI sekarang: ${_statusAqi(_dataAqi!.aqi)}',
-                        aqi: _dataAqi!.aqi,
-                      );
-                    },
-                    icon: const Icon(Icons.notifications_active),
-                    label: const Text('Kirim Notifikasi dengan Waktu'),
+                    ],
                   ),
                 ],
               ),

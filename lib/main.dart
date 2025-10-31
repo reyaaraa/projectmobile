@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/login_page.dart';
 import 'services/notification_service.dart';
+import 'pages/navbar.dart';
 import 'services/secure_store.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -38,7 +39,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
         if (snapshot.hasData && snapshot.data != null) {
-          return const HomePage();
+          return const Navbar();
         }
         return const LoginPage();
       },

@@ -62,15 +62,6 @@ class _TokoPageState extends State<TokoPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7FCFC),
-      appBar: AppBar(
-        title: const Text(
-          'Toko Kesehatan',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 3,
-      ),
 
       body: Column(
         children: [
