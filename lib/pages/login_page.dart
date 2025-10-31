@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../services/database_service.dart';
 import '../services/secure_store.dart';
-import 'home_page.dart';
+import 'navbar.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -38,7 +38,7 @@ class _LoginPageState extends State<LoginPage> {
       // Navigasi ke Home
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (context) => const Navbar()),
         );
       }
     } else {
@@ -113,7 +113,9 @@ class _LoginPageState extends State<LoginPage> {
                       label: Text(
                         'Login',
                         style: GoogleFonts.poppins(
-                            fontSize: 16, color: Colors.white),
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
               const SizedBox(height: 16),
@@ -121,7 +123,8 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                        builder: (context) => const RegisterPage()),
+                      builder: (context) => const RegisterPage(),
+                    ),
                   );
                 },
                 child: Text(

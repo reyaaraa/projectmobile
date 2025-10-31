@@ -20,19 +20,27 @@ class SecureStore {
 
   /// Write value (encrypted) into secure storage
   static Future<void> writeEncrypted(String key, String value) async {
-    final iv = IV.fromLength(16);
+    final iv = IV.fromLength(16); // IV acak untuk setiap enkripsi
     final encrypted = _encrypter.encrypt(value, iv: iv);
-    await _storage.write(key: key, value: encrypted.base64);
+
+    // Gabungkan IV dan ciphertext, pisahkan dengan titik dua.
+    // Format: iv_base64:ciphertext_base64
+    final combined = '${iv.base64}:${encrypted.base64}';
+    await _storage.write(key: key, value: combined);
   }
 
   /// Read and decrypt value
   static Future<String?> readEncrypted(String key) async {
-    final base64 = await _storage.read(key: key);
-    if (base64 == null) return null;
-    final encrypted = Encrypted.fromBase64(base64);
-    final iv = IV.fromLength(16);
-    final decrypted = _encrypter.decrypt(encrypted, iv: iv);
-    return decrypted;
+    final combined = await _storage.read(key: key);
+    if (combined == null || !combined.contains(':')) return null;
+
+    // Pisahkan kembali IV dan ciphertext
+    final parts = combined.split(':');
+    final iv = IV.fromBase64(parts[0]);
+    final encrypted = Encrypted.fromBase64(parts[1]);
+
+    // Dekripsi menggunakan IV yang benar
+    return _encrypter.decrypt(encrypted, iv: iv);
   }
 
   /// Delete key
