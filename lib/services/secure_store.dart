@@ -13,8 +13,8 @@ class SecureStore {
   // WARNING: untuk demo. di produksi jangan hardcode secret key,
   // gunakan keystore/platform-specific secure key derivation.
   static final _aesKey = Key.fromUtf8(
-    'paruguard_demo_32bytes_key_______',
-  ); // 32 chars
+    'paruguard_demo_32bytes_secretkey', // Corrected to 32 characters
+  ); // 32 chars/bytes for AES-256
 
   static final _encrypter = Encrypter(AES(_aesKey, mode: AESMode.cbc));
 
